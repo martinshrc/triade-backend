@@ -1,0 +1,210 @@
+// ============================================================
+// SCHEMA PRISMA — Tríade Painel de Afiliados
+// IDs: UUID v4 (não sequencial) para segurança
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// USUÁRIOS / AFILIADOS
+// ============================================================
+model User {
+  id           String   @id @default(uuid())
+
+  name         String
+  email        String   @unique
+  passwordHash String
+
+  // ID do afiliado na casa de aposta
+  externalId   String?
+
+  // CPA definido pelo admin/upline
+  cpaValue     Decimal  @default(0) @db.Decimal(10, 2)
+
+  // Dados de pagamento PIX
+  pixKeyType   String?
+  pixKey       String?
+
+  // Hierarquia de rede
+  referrerId   String?
+  referrer     User?    @relation("Network", fields: [referrerId], references: [id])
+  referrals    User[]   @relation("Network")
+
+  // Status do afiliado
+  status       UserStatus @default(PENDING)
+
+  // Refresh token (rotacionado a cada login)
+  refreshToken String?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  affiliateLinks AffiliateLink[]
+  playerStats    PlayerStat[]
+  commissions    Commission[]
+  payments       Payment[]
+  approvals      Approval[]
+
+  @@map("users")
+}
+
+enum UserStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ============================================================
+// CASAS DE APOSTA
+// ============================================================
+model BettingHouse {
+  id       String  @id @default(uuid())
+  name     String
+  slug     String  @unique
+
+  apiBaseUrl  String?
+  apiKey      String?
+  apiSecret   String?
+
+  isActive Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  affiliateLinks AffiliateLink[]
+  playerStats    PlayerStat[]
+
+  @@map("betting_houses")
+}
+
+// ============================================================
+// LINKS DE AFILIADO
+// ============================================================
+model AffiliateLink {
+  id    String @id @default(uuid())
+
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+
+  bettingHouseId String
+  bettingHouse   BettingHouse @relation(fields: [bettingHouseId], references: [id])
+
+  refCode  String
+  dbCode   String?
+  fullUrl  String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("affiliate_links")
+}
+
+// ============================================================
+// ESTATÍSTICAS DE JOGADORES
+// ============================================================
+model PlayerStat {
+  id    String @id @default(uuid())
+
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+
+  bettingHouseId String
+  bettingHouse   BettingHouse @relation(fields: [bettingHouseId], references: [id])
+
+  date          DateTime
+
+  registrations Int     @default(0)
+  cpas          Int     @default(0)
+  ftds          Int     @default(0)
+  deposits      Decimal @default(0) @db.Decimal(15, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, bettingHouseId, date])
+  @@map("player_stats")
+}
+
+// ============================================================
+// COMISSÕES
+// ============================================================
+model Commission {
+  id     String @id @default(uuid())
+
+  userId String
+  user   User @relation(fields: [userId], references: [id])
+
+  amount      Decimal  @db.Decimal(15, 2)
+  periodStart DateTime
+  periodEnd   DateTime
+  status      CommissionStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("commissions")
+}
+
+enum CommissionStatus {
+  PENDING
+  PAID
+}
+
+// ============================================================
+// PAGAMENTOS
+// ============================================================
+model Payment {
+  id     String @id @default(uuid())
+
+  userId String
+  user   User @relation(fields: [userId], references: [id])
+
+  amount   Decimal @db.Decimal(15, 2)
+  pixKey   String
+  status   PaymentStatus @default(PENDING)
+
+  paidAt    DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("payments")
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  REJECTED
+}
+
+// ============================================================
+// APROVAÇÕES
+// ============================================================
+model Approval {
+  id     String @id @default(uuid())
+
+  userId String
+  user   User @relation(fields: [userId], references: [id])
+
+  status     ApprovalStatus @default(PENDING)
+  cpaValue   Decimal?       @db.Decimal(10, 2)
+  reviewedAt DateTime?
+  notes      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("approvals")
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
