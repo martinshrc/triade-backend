@@ -40,6 +40,22 @@ export const loginSchema = z.object({
 export type RegisterInput = z.infer<typeof registerSchema>
 export type LoginInput = z.infer<typeof loginSchema>
 
+// ---- Helpers ----
+
+const INVITE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // sem chars ambíguos
+
+async function generateUniqueInviteCode(): Promise<string> {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const code = Array.from(
+      { length: 8 },
+      () => INVITE_CHARS[Math.floor(Math.random() * INVITE_CHARS.length)]
+    ).join('')
+    const exists = await prisma.user.findUnique({ where: { inviteCode: code }, select: { id: true } })
+    if (!exists) return code
+  }
+  throw new Error('Não foi possível gerar código de convite único.')
+}
+
 // ---- Funções ----
 
 export async function register(input: RegisterInput) {
@@ -49,20 +65,23 @@ export async function register(input: RegisterInput) {
   const existing = await prisma.user.findUnique({ where: { email } })
   if (existing) throw new Error('E-mail já cadastrado.')
 
-  // Resolve upline via referralCode (externalId do afiliado que indicou)
+  // Resolve upline via inviteCode do sistema Tríade
   let referrerId: string | undefined
   if (referralCode) {
     const referrer = await prisma.user.findFirst({
-      where: { externalId: referralCode, status: 'APPROVED' },
+      where: { inviteCode: referralCode, status: 'APPROVED' },
       select: { id: true },
     })
     if (referrer) referrerId = referrer.id
   }
 
-  const passwordHash = await bcrypt.hash(password, 12)
+  const [passwordHash, inviteCode] = await Promise.all([
+    bcrypt.hash(password, 12),
+    generateUniqueInviteCode(),
+  ])
 
   const user = await prisma.user.create({
-    data: { name, email, passwordHash, referrerId, status: 'PENDING', instagram, whatsapp, market, ftdsEstimate },
+    data: { name, email, passwordHash, referrerId, inviteCode, status: 'PENDING', instagram, whatsapp, market, ftdsEstimate },
     select: { id: true, name: true, email: true, status: true },
   })
 
@@ -115,6 +134,13 @@ export async function login(input: LoginInput) {
   const passwordMatch = await bcrypt.compare(password, user?.passwordHash ?? fakeHash)
 
   if (!user || !passwordMatch) throw new Error('E-mail ou senha inválidos.')
+
+  // Gera inviteCode lazy para usuários criados antes desta feature
+  let inviteCode = user.inviteCode
+  if (!inviteCode) {
+    inviteCode = await generateUniqueInviteCode()
+    await prisma.user.update({ where: { id: user.id }, data: { inviteCode } })
+  }
 
   // Gera tokens
   const accessToken = generateAccessToken(user.id, user.role)

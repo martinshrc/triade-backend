@@ -113,8 +113,27 @@ export async function meHandler(req: Request, res: Response) {
   const { default: prisma } = await import('../config/database')
   const user = await prisma.user.findUnique({
     where: { id: req.user.id },
-    select: { id: true, name: true, email: true, status: true, role: true, cpaValue: true, externalId: true, whatsapp: true },
+    select: { id: true, name: true, email: true, status: true, role: true, cpaValue: true, externalId: true, whatsapp: true, inviteCode: true },
   })
   if (!user) { res.status(404).json({ error: 'Usuário não encontrado.' }); return }
   res.json(user)
+}
+
+// Endpoint público — retorna só o nome do dono do código (para exibir "Convidado por X" no cadastro)
+export async function getInviterHandler(req: Request, res: Response) {
+  const { default: prisma } = await import('../config/database')
+  const code = String(req.params.code ?? '').trim().toUpperCase()
+  if (!code) { res.status(400).json({ error: 'Código inválido.' }); return }
+
+  const user = await prisma.user.findUnique({
+    where: { inviteCode: code },
+    select: { name: true, status: true },
+  })
+
+  if (!user || user.status !== 'APPROVED') {
+    res.status(404).json({ error: 'Código não encontrado.' })
+    return
+  }
+
+  res.json({ name: user.name })
 }

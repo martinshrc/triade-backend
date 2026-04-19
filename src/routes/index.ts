@@ -9,7 +9,7 @@ import { requireAuth, requireRole } from '../middlewares/auth.middleware'
 // Auth
 import {
   registerHandler, loginHandler, refreshHandler, logoutHandler, meHandler,
-  updateProfileHandler, changePasswordHandler, checkEmailHandler,
+  updateProfileHandler, changePasswordHandler, checkEmailHandler, getInviterHandler,
 } from '../controllers/auth.controller'
 
 // App
@@ -74,6 +74,7 @@ router.get('/auth/me', requireAuth, meHandler)
 router.patch('/auth/profile', requireAuth, updateProfileHandler)
 router.patch('/auth/password', requireAuth, changePasswordHandler)
 router.get('/auth/check-email', checkEmailHandler)
+router.get('/auth/invite/:code', getInviterHandler)
 
 // ---- Rotas gerais (qualquer usuário autenticado) ----
 router.get('/dashboard', requireAuth, dashboard)
