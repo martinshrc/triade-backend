@@ -1,5 +1,8 @@
 FROM node:20-alpine
 
+# OpenSSL necessário para o Prisma rodar migrations
+RUN apk add --no-cache openssl
+
 WORKDIR /app
 
 # Copia dependências primeiro (cache de camadas)
