@@ -113,6 +113,123 @@ export async function reviewBetRequest(
   })
 }
 
+// Admin concede acesso diretamente (upsert request → APPROVED + link opcional)
+export async function grantBetAccess(
+  adminId: string, adminRole: string,
+  userId: string, bettingHouseId: string,
+  refCode?: string, fullUrl?: string,
+) {
+  // Team admin só pode gerenciar afiliados da sua equipe
+  if (adminRole === 'TEAM_ADMIN') {
+    const target = await prisma.user.findUnique({ where: { id: userId }, select: { referrerId: true } })
+    if (target?.referrerId !== adminId) throw new Error('Este usuário não pertence à sua equipe.')
+  }
+
+  const existing = await prisma.betAccessRequest.findUnique({
+    where: { userId_bettingHouseId: { userId, bettingHouseId } },
+  })
+
+  const request = existing
+    ? await prisma.betAccessRequest.update({
+        where: { id: existing.id },
+        data: { status: 'APPROVED', reviewedById: adminId, reviewedAt: new Date(), notes: null },
+        include: { user: { select: { name: true } }, bettingHouse: { select: { name: true } } },
+      })
+    : await prisma.betAccessRequest.create({
+        data: { userId, bettingHouseId, status: 'APPROVED', reviewedById: adminId, reviewedAt: new Date() },
+        include: { user: { select: { name: true } }, bettingHouse: { select: { name: true } } },
+      })
+
+  // Upsert link se fornecido
+  if (refCode && fullUrl) {
+    const existingLink = await prisma.affiliateLink.findFirst({ where: { userId, bettingHouseId } })
+    if (existingLink) {
+      await prisma.affiliateLink.update({ where: { id: existingLink.id }, data: { refCode, fullUrl } })
+    } else {
+      await prisma.affiliateLink.create({ data: { userId, bettingHouseId, refCode, fullUrl } })
+    }
+  }
+
+  return {
+    ...request,
+    userName: (request as { user?: { name?: string } }).user?.name ?? userId,
+    houseName: (request as { bettingHouse?: { name?: string } }).bettingHouse?.name ?? bettingHouseId,
+  }
+}
+
+// Lista todos os usuários + status de acesso para uma casa de aposta
+export async function listHouseUsers(adminId: string, adminRole: string, houseId: string) {
+  // Todos os usuários aprovados no sistema (ou da equipe se TEAM_ADMIN)
+  const usersWhere = adminRole === 'TEAM_ADMIN'
+    ? { referrerId: adminId, status: 'APPROVED' as const }
+    : { status: 'APPROVED' as const }
+
+  const [users, requests, links] = await Promise.all([
+    prisma.user.findMany({
+      where: usersWhere,
+      select: { id: true, name: true, email: true, role: true },
+      orderBy: { name: 'asc' },
+    }),
+    prisma.betAccessRequest.findMany({
+      where: { bettingHouseId: houseId },
+      select: { userId: true, status: true, id: true },
+    }),
+    prisma.affiliateLink.findMany({
+      where: { bettingHouseId: houseId },
+      select: { userId: true, refCode: true, fullUrl: true, id: true },
+    }),
+  ])
+
+  const requestMap = Object.fromEntries(requests.map((r) => [r.userId, r]))
+  const linkMap = Object.fromEntries(links.map((l) => [l.userId, l]))
+
+  return {
+    users: users.map((u) => ({
+      ...u,
+      accessStatus: requestMap[u.id]?.status ?? null,
+      requestId: requestMap[u.id]?.id ?? null,
+      affiliateLink: linkMap[u.id] ?? null,
+    })),
+  }
+}
+
+// Lista todas as bets + status de acesso de um usuário específico
+export async function listUserBets(adminId: string, adminRole: string, userId: string) {
+  // Valida que o admin pode ver este usuário
+  if (adminRole === 'TEAM_ADMIN') {
+    const target = await prisma.user.findUnique({ where: { id: userId }, select: { referrerId: true } })
+    if (target?.referrerId !== adminId) throw new Error('Este usuário não pertence à sua equipe.')
+  }
+
+  const [houses, requests, links] = await Promise.all([
+    prisma.bettingHouse.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, slug: true },
+      orderBy: { name: 'asc' },
+    }),
+    prisma.betAccessRequest.findMany({
+      where: { userId },
+      select: { bettingHouseId: true, status: true, id: true },
+    }),
+    prisma.affiliateLink.findMany({
+      where: { userId },
+      select: { bettingHouseId: true, refCode: true, fullUrl: true, id: true },
+    }),
+  ])
+
+  const requestMap = Object.fromEntries(requests.map((r) => [r.bettingHouseId, r]))
+  const linkMap = Object.fromEntries(links.map((l) => [l.bettingHouseId, l]))
+
+  return {
+    bets: houses.map((h) => ({
+      ...h,
+      accessStatus: requestMap[h.id]?.status ?? null,
+      requestId: requestMap[h.id]?.id ?? null,
+      affiliateLink: linkMap[h.id] ?? null,
+    })),
+  }
+}
+
 // Lista todas as BETs com status de acesso do afiliado logado
 export async function listBetsWithAccess(userId: string) {
   const [houses, requests] = await Promise.all([

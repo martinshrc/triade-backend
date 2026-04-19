@@ -39,6 +39,7 @@ import { listActivityLogsHandler } from '../controllers/activity-logs.controller
 import {
   requestBetAccessHandler, listBetRequestsHandler,
   reviewBetRequestHandler, myBetsAccessHandler,
+  grantBetAccessHandler, listHouseUsersHandler, listUserBetsHandler,
 } from '../controllers/bet-access.controller'
 
 const router = Router()
@@ -93,7 +94,10 @@ router.post('/bet-access', requireAuth, requestBetAccessHandler)
 
 // ---- BETs — aprovação (TEAM_ADMIN ou SUPER_ADMIN) ----
 router.get('/bet-access', requireAuth, requireRole('TEAM_ADMIN', 'SUPER_ADMIN'), listBetRequestsHandler)
+router.post('/bet-access/grant', requireAuth, requireRole('TEAM_ADMIN', 'SUPER_ADMIN'), grantBetAccessHandler)
 router.patch('/bet-access/:id', requireAuth, requireRole('TEAM_ADMIN', 'SUPER_ADMIN'), reviewBetRequestHandler)
+router.get('/betting-houses/:id/users', requireAuth, requireRole('TEAM_ADMIN', 'SUPER_ADMIN'), listHouseUsersHandler)
+router.get('/users/:id/bets', requireAuth, requireRole('TEAM_ADMIN', 'SUPER_ADMIN'), listUserBetsHandler)
 
 // ---- Equipe (TEAM_ADMIN ou SUPER_ADMIN) ----
 router.get('/team', requireAuth, requireRole('TEAM_ADMIN', 'SUPER_ADMIN'), team)

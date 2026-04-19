@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import {
   createBetRequest, listBetRequests, reviewBetRequest, listBetsWithAccess,
+  grantBetAccess, listHouseUsers, listUserBets,
 } from '../services/bet-access.service'
 import { logActivity, getIp } from '../lib/activity'
 
@@ -39,5 +40,36 @@ export async function reviewBetRequestHandler(req: Request, res: Response) {
 
 export async function myBetsAccessHandler(req: Request, res: Response) {
   const data = await listBetsWithAccess(req.user.id)
+  res.json(data)
+}
+
+// Admin concede acesso diretamente (sem precisar de solicitação do afiliado)
+export async function grantBetAccessHandler(req: Request, res: Response) {
+  const { userId, bettingHouseId, refCode, fullUrl } = req.body
+  if (!userId || !bettingHouseId) {
+    res.status(400).json({ error: 'userId e bettingHouseId são obrigatórios.' })
+    return
+  }
+  const result = await grantBetAccess(
+    req.user.id, req.user.role,
+    String(userId), String(bettingHouseId),
+    refCode ? String(refCode) : undefined,
+    fullUrl ? String(fullUrl) : undefined,
+  )
+  logActivity(req.user.id, `grant_bet:${result.houseName}:${result.userName}`, getIp(req))
+  res.json(result)
+}
+
+// Lista usuários e seus acessos para uma casa de aposta
+export async function listHouseUsersHandler(req: Request, res: Response) {
+  const houseId = String(req.params.id)
+  const data = await listHouseUsers(req.user.id, req.user.role, houseId)
+  res.json(data)
+}
+
+// Lista todas as bets com status de acesso de um usuário específico
+export async function listUserBetsHandler(req: Request, res: Response) {
+  const userId = String(req.params.id)
+  const data = await listUserBets(req.user.id, req.user.role, userId)
   res.json(data)
 }
