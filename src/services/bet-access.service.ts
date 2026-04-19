@@ -159,10 +159,11 @@ export async function grantBetAccess(
 
 // Lista todos os usuários + status de acesso para uma casa de aposta
 export async function listHouseUsers(adminId: string, adminRole: string, houseId: string) {
-  // Todos os usuários aprovados no sistema (ou da equipe se TEAM_ADMIN)
+  // Todos os usuários não-rejeitados (ou da equipe se TEAM_ADMIN)
+  // Inclui PENDING para permitir pré-atribuição antes da aprovação
   const usersWhere = adminRole === 'TEAM_ADMIN'
-    ? { referrerId: adminId, status: 'APPROVED' as const }
-    : { status: 'APPROVED' as const }
+    ? { referrerId: adminId, status: { not: 'REJECTED' as const } }
+    : { status: { not: 'REJECTED' as const } }
 
   const [users, requests, links] = await Promise.all([
     prisma.user.findMany({
@@ -195,7 +196,7 @@ export async function listHouseUsers(adminId: string, adminRole: string, houseId
 
 // Lista todas as bets + status de acesso de um usuário específico
 export async function listUserBets(adminId: string, adminRole: string, userId: string) {
-  // Valida que o admin pode ver este usuário
+  // Valida que o admin pode ver este usuário (TEAM_ADMIN só vê sua equipe, SUPER_ADMIN vê todos)
   if (adminRole === 'TEAM_ADMIN') {
     const target = await prisma.user.findUnique({ where: { id: userId }, select: { referrerId: true } })
     if (target?.referrerId !== adminId) throw new Error('Este usuário não pertence à sua equipe.')
