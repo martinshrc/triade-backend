@@ -1,7 +1,7 @@
-FROM node:20-alpine
+FROM node:20-slim
 
 # OpenSSL necessário para o Prisma rodar migrations
-RUN apk add --no-cache openssl
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
