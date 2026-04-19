@@ -2,11 +2,13 @@ import { Request, Response } from 'express'
 import { ApprovalStatus } from '@prisma/client'
 import { getApprovals, reviewApproval } from '../services/approvals.service'
 
+const MAX_LIMIT = 50
+
 export async function approvals(req: Request, res: Response) {
   const status = (req.query.status as ApprovalStatus) ?? ApprovalStatus.PENDING
-  const search = req.query.search ? String(req.query.search) : undefined
-  const page = Number(req.query.page ?? 1)
-  const limit = Number(req.query.limit ?? 20)
+  const search = req.query.search ? String(req.query.search).slice(0, 100) : undefined
+  const page = Math.max(1, Number(req.query.page ?? 1))
+  const limit = Math.min(MAX_LIMIT, Math.max(1, Number(req.query.limit ?? 20)))
 
   if (!Object.values(ApprovalStatus).includes(status)) {
     res.status(400).json({ error: 'Status inválido. Use: PENDING, APPROVED ou REJECTED.' })
@@ -26,6 +28,11 @@ export async function patchApproval(req: Request, res: Response) {
     return
   }
 
-  const updated = await reviewApproval(approvalId, status as ApprovalStatus, cpaValue)
+  if (cpaValue !== undefined && (typeof cpaValue !== 'number' || cpaValue < 0 || cpaValue > 100000)) {
+    res.status(400).json({ error: 'cpaValue inválido.' })
+    return
+  }
+
+  const updated = await reviewApproval(req.user.id, approvalId, status as ApprovalStatus, cpaValue)
   res.json(updated)
 }

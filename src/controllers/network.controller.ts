@@ -7,7 +7,8 @@ export async function network(req: Request, res: Response) {
   let endDate: Date | undefined
   if (req.query.from) startDate = new Date(String(req.query.from))
   if (req.query.to) endDate = new Date(String(req.query.to))
+  const search = req.query.q ? String(req.query.q) : undefined
 
-  const data = await getNetwork(userId, 4, startDate, endDate)
+  const data = await getNetwork(userId, 4, startDate, endDate, search)
   res.json(data)
 }

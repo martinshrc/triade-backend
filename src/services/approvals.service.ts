@@ -39,11 +39,15 @@ export async function getApprovals(
 }
 
 export async function reviewApproval(
+  reviewerId: string,
   approvalId: string,
   status: ApprovalStatus,
   cpaValue?: number
 ) {
-  const approval = await prisma.approval.findUnique({ where: { id: approvalId } })
+  // Busca a aprovação e verifica que o solicitante é indicado direto do revisor (anti-IDOR)
+  const approval = await prisma.approval.findFirst({
+    where: { id: approvalId, user: { referrerId: reviewerId } },
+  })
   if (!approval) throw new Error('Aprovação não encontrada.')
 
   const updated = await prisma.approval.update({

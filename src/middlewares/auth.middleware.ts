@@ -1,18 +1,14 @@
 // ============================================================
-// MIDDLEWARE — Autenticação JWT
-// ============================================================
-// Lê o token do cookie httpOnly (mais seguro que Authorization header
-// para SPAs, pois é inacessível via JS).
+// MIDDLEWARE — Autenticação JWT + controle de roles
 // ============================================================
 
 import { Request, Response, NextFunction } from 'express'
 import { verifyAccessToken } from '../services/auth.service'
 
-// Extende o tipo Request para carregar o usuário autenticado
 declare global {
   namespace Express {
     interface Request {
-      user: { id: string }
+      user: { id: string; role: string }
     }
   }
 }
@@ -27,9 +23,19 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
 
   try {
     const payload = verifyAccessToken(token)
-    req.user = { id: payload.sub }
+    req.user = { id: payload.sub, role: payload.role ?? 'AFFILIATE' }
     next()
   } catch {
     res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' })
+  }
+}
+
+export function requireRole(...roles: string[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!roles.includes(req.user?.role)) {
+      res.status(403).json({ error: 'Acesso negado.' })
+      return
+    }
+    next()
   }
 }

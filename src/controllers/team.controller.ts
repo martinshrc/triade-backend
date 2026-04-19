@@ -1,10 +1,12 @@
 import { Request, Response } from 'express'
 import { getTeam, updateMemberCpa } from '../services/team.service'
 
+const MAX_LIMIT = 50
+
 export async function team(req: Request, res: Response) {
   const userId = req.user.id
-  const page = Number(req.query.page ?? 1)
-  const limit = Number(req.query.limit ?? 20)
+  const page = Math.max(1, Number(req.query.page ?? 1))
+  const limit = Math.min(MAX_LIMIT, Math.max(1, Number(req.query.limit ?? 20)))
 
   const data = await getTeam(userId, page, limit)
   res.json(data)

@@ -12,13 +12,24 @@ import { jwtConfig } from '../config/jwt'
 
 export const registerSchema = z.object({
   name: z.string().min(2, 'Nome deve ter ao menos 2 caracteres').max(100),
-  email: z.string().email('E-mail inválido').toLowerCase(),
+  email: z.string().email('E-mail inválido').toLowerCase()
+    .regex(/\.(com|com\.br)$/i, 'Use e-mail com final .com ou .com.br'),
   password: z
     .string()
     .min(8, 'Senha deve ter ao menos 8 caracteres')
-    .regex(/[A-Z]/, 'Senha deve ter ao menos uma letra maiúscula')
-    .regex(/[0-9]/, 'Senha deve ter ao menos um número'),
-  referralCode: z.string().optional(), // código de convite (externalId do upline)
+    .regex(/[A-Z]/, 'Senha deve conter ao menos uma letra maiúscula')
+    .regex(/[a-z]/, 'Senha deve conter ao menos uma letra minúscula')
+    .regex(/[0-9]/, 'Senha deve conter ao menos um número')
+    .regex(/[^A-Za-z0-9]/, 'Senha deve conter ao menos um caractere especial'),
+  instagram: z.string().max(60).optional(),
+  whatsapp: z
+    .string()
+    .min(10, 'WhatsApp inválido. Informe DDI + DDD + número (ex: 5511999990000)')
+    .max(20)
+    .regex(/^\d+$/, 'WhatsApp deve conter só números'),
+  market: z.string().max(100).optional(),
+  ftdsEstimate: z.string().max(30).optional(),
+  referralCode: z.string().optional(),
 })
 
 export const loginSchema = z.object({
@@ -32,7 +43,7 @@ export type LoginInput = z.infer<typeof loginSchema>
 // ---- Funções ----
 
 export async function register(input: RegisterInput) {
-  const { name, email, password, referralCode } = input
+  const { name, email, password, referralCode, instagram, whatsapp, market, ftdsEstimate } = input
 
   // Verifica se e-mail já existe
   const existing = await prisma.user.findUnique({ where: { email } })
@@ -48,19 +59,50 @@ export async function register(input: RegisterInput) {
     if (referrer) referrerId = referrer.id
   }
 
-  // Hash da senha — bcrypt custo 12 (lento o suficiente para dificultar brute force)
   const passwordHash = await bcrypt.hash(password, 12)
 
-  // Cria o usuário
   const user = await prisma.user.create({
-    data: { name, email, passwordHash, referrerId, status: 'PENDING' },
+    data: { name, email, passwordHash, referrerId, status: 'PENDING', instagram, whatsapp, market, ftdsEstimate },
     select: { id: true, name: true, email: true, status: true },
   })
 
-  // Cria solicitação de aprovação automática
   await prisma.approval.create({ data: { userId: user.id } })
 
   return user
+}
+
+export const updateProfileSchema = z.object({
+  name: z.string().min(2).max(100).optional(),
+  email: z.string().email().toLowerCase()
+    .regex(/\.(com|com\.br)$/i, 'Use e-mail com final .com ou .com.br').optional(),
+  whatsapp: z.string().max(20).regex(/^\d*$/, 'WhatsApp deve conter só números').optional(),
+})
+
+export async function updateProfile(userId: string, input: z.infer<typeof updateProfileSchema>) {
+  if (input.email) {
+    const existing = await prisma.user.findFirst({ where: { email: input.email, NOT: { id: userId } } })
+    if (existing) throw new Error('E-mail já está em uso.')
+  }
+  return prisma.user.update({
+    where: { id: userId },
+    data: input,
+    select: { id: true, name: true, email: true, whatsapp: true },
+  })
+}
+
+export const changePasswordSchema = z.object({
+  password: z
+    .string()
+    .min(8, 'Senha deve ter ao menos 8 caracteres')
+    .regex(/[A-Z]/, 'Senha deve conter ao menos uma letra maiúscula')
+    .regex(/[a-z]/, 'Senha deve conter ao menos uma letra minúscula')
+    .regex(/[0-9]/, 'Senha deve conter ao menos um número')
+    .regex(/[^A-Za-z0-9]/, 'Senha deve conter ao menos um caractere especial'),
+})
+
+export async function changePassword(userId: string, newPassword: string) {
+  const hash = await bcrypt.hash(newPassword, 12)
+  await prisma.user.update({ where: { id: userId }, data: { passwordHash: hash, refreshToken: null } })
 }
 
 export async function login(input: LoginInput) {
@@ -75,7 +117,7 @@ export async function login(input: LoginInput) {
   if (!user || !passwordMatch) throw new Error('E-mail ou senha inválidos.')
 
   // Gera tokens
-  const accessToken = generateAccessToken(user.id)
+  const accessToken = generateAccessToken(user.id, user.role)
   const refreshToken = generateRefreshToken(user.id)
 
   // Salva hash do refresh token no banco (rotacionado a cada login)
@@ -83,7 +125,7 @@ export async function login(input: LoginInput) {
   await prisma.user.update({ where: { id: user.id }, data: { refreshToken: refreshHash } })
 
   return {
-    user: { id: user.id, name: user.name, email: user.email, status: user.status },
+    user: { id: user.id, name: user.name, email: user.email, status: user.status, role: user.role },
     accessToken,
     refreshToken,
   }
@@ -92,7 +134,7 @@ export async function login(input: LoginInput) {
 export async function refresh(userId: string, token: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, name: true, email: true, status: true, refreshToken: true },
+    select: { id: true, name: true, email: true, status: true, role: true, refreshToken: true },
   })
 
   if (!user?.refreshToken) throw new Error('Sessão inválida.')
@@ -101,14 +143,14 @@ export async function refresh(userId: string, token: string) {
   if (!valid) throw new Error('Sessão inválida.')
 
   // Rotaciona o refresh token
-  const newAccessToken = generateAccessToken(user.id)
+  const newAccessToken = generateAccessToken(user.id, user.role)
   const newRefreshToken = generateRefreshToken(user.id)
   const newRefreshHash = await bcrypt.hash(newRefreshToken, 10)
 
   await prisma.user.update({ where: { id: user.id }, data: { refreshToken: newRefreshHash } })
 
   return {
-    user: { id: user.id, name: user.name, email: user.email, status: user.status },
+    user: { id: user.id, name: user.name, email: user.email, status: user.status, role: user.role },
     accessToken: newAccessToken,
     refreshToken: newRefreshToken,
   }
@@ -121,8 +163,8 @@ export async function logout(userId: string) {
 
 // ---- Helpers ----
 
-function generateAccessToken(userId: string): string {
-  return jwt.sign({ sub: userId }, jwtConfig.secret, {
+function generateAccessToken(userId: string, role: string): string {
+  return jwt.sign({ sub: userId, role }, jwtConfig.secret, {
     expiresIn: jwtConfig.expiresIn as jwt.SignOptions['expiresIn'],
   })
 }
@@ -133,6 +175,6 @@ function generateRefreshToken(userId: string): string {
   })
 }
 
-export function verifyAccessToken(token: string): { sub: string } {
-  return jwt.verify(token, jwtConfig.secret) as { sub: string }
+export function verifyAccessToken(token: string): { sub: string; role: string } {
+  return jwt.verify(token, jwtConfig.secret) as { sub: string; role: string }
 }

@@ -22,6 +22,9 @@ model User {
   email        String   @unique
   passwordHash String
 
+  // Perfil de acesso
+  role         Role     @default(AFFILIATE)
+
   // ID do afiliado na casa de aposta
   externalId   String?
 
@@ -31,6 +34,12 @@ model User {
   // Dados de pagamento PIX
   pixKeyType   String?
   pixKey       String?
+
+  // Dados extras do afiliado (cadastro)
+  whatsapp     String?
+  instagram    String?
+  market       String?
+  ftdsEstimate String?
 
   // Hierarquia de rede
   referrerId   String?
@@ -46,16 +55,57 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  affiliateLinks AffiliateLink[]
-  playerStats    PlayerStat[]
-  commissions    Commission[]
-  payments       Payment[]
-  approvals      Approval[]
+  affiliateLinks   AffiliateLink[]
+  playerStats      PlayerStat[]
+  commissions      Commission[]
+  payments         Payment[]
+  approvals        Approval[]
+  nfes             Nfe[]
+  betRequests      BetAccessRequest[] @relation("UserBetRequests")
+  reviewedRequests BetAccessRequest[] @relation("ReviewedBetRequests")
 
   @@map("users")
 }
 
+enum Role {
+  SUPER_ADMIN
+  TEAM_ADMIN
+  AFFILIATE
+}
+
 enum UserStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ============================================================
+// SOLICITAÇÕES DE ACESSO A CASAS DE APOSTA
+// ============================================================
+model BetAccessRequest {
+  id             String @id @default(uuid())
+
+  userId         String
+  user           User   @relation("UserBetRequests", fields: [userId], references: [id])
+
+  bettingHouseId String
+  bettingHouse   BettingHouse @relation(fields: [bettingHouseId], references: [id])
+
+  status         BetAccessStatus @default(PENDING)
+
+  reviewedById   String?
+  reviewedBy     User?  @relation("ReviewedBetRequests", fields: [reviewedById], references: [id])
+  reviewedAt     DateTime?
+  notes          String?
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, bettingHouseId])
+  @@map("bet_access_requests")
+}
+
+enum BetAccessStatus {
   PENDING
   APPROVED
   REJECTED
@@ -73,13 +123,25 @@ model BettingHouse {
   apiKey      String?
   apiSecret   String?
 
+  // Suporte
+  supportWhatsapp String?
+
+  // Dados fiscais para emissão de NFE pelo afiliado
+  fiscalName      String?   // Razão Social
+  fiscalFantasy   String?   // Nome Fantasia
+  fiscalCnpj      String?
+  fiscalCnae      String?
+  fiscalNote      String?   // Aviso/instrução adicional
+
   isActive Boolean  @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  affiliateLinks AffiliateLink[]
-  playerStats    PlayerStat[]
+  affiliateLinks   AffiliateLink[]
+  playerStats      PlayerStat[]
+  materials        Material[]
+  betAccessRequests BetAccessRequest[]
 
   @@map("betting_houses")
 }
@@ -207,4 +269,60 @@ enum ApprovalStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+// ============================================================
+// NOTAS FISCAIS
+// ============================================================
+model Nfe {
+  id     String @id @default(uuid())
+
+  userId String
+  user   User @relation(fields: [userId], references: [id])
+
+  periodFrom      DateTime
+  periodTo        DateTime
+  emailPlatform   String
+
+  bankName        String?
+  bankAgency      String?
+  bankAccount     String?
+  bankAccountType String?
+
+  pixKeyType      String?
+  pixKey          String?
+
+  pdfPath         String?
+  status          NfeStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("nfes")
+}
+
+enum NfeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ============================================================
+// MATERIAIS
+// ============================================================
+model Material {
+  id   String @id @default(uuid())
+  name String
+  type String  // banner | video | pdf | outro
+
+  url      String
+  isActive Boolean @default(true)
+
+  bettingHouseId String?
+  bettingHouse   BettingHouse? @relation(fields: [bettingHouseId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("materials")
 }
