@@ -27,16 +27,21 @@ const allowedOrigins =
     ? productionOrigins
     : ['http://localhost:5173', 'http://localhost:4173', 'http://localhost:8080']
 
-const corsOptions = {
-  origin: allowedOrigins,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
-}
-
-// Responde preflight OPTIONS explicitamente
-app.options('*', cors(corsOptions))
-app.use(cors(corsOptions))
+// CORS manual — garante headers independente do proxy
+app.use((req, res, next) => {
+  const origin = req.headers.origin as string | undefined
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin)
+    res.setHeader('Access-Control-Allow-Credentials', 'true')
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,Cookie')
+  }
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(204)
+    return
+  }
+  next()
+})
 
 app.use(express.json())
 app.use(cookieParser())
