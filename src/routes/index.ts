@@ -26,6 +26,15 @@ import { createNfe, listNfes } from '../controllers/nfe.controller'
 // Gestão de usuários (SUPER_ADMIN)
 import { getUsersHandler, patchUserRoleHandler, patchUserTeamHandler } from '../controllers/users.controller'
 
+// Casas de aposta (SUPER_ADMIN)
+import {
+  listBettingHousesHandler, createBettingHouseHandler,
+  updateBettingHouseHandler, deleteBettingHouseHandler,
+} from '../controllers/betting-houses.controller'
+
+// Logs de atividade (SUPER_ADMIN)
+import { listActivityLogsHandler } from '../controllers/activity-logs.controller'
+
 // Solicitações de acesso a BETs
 import {
   requestBetAccessHandler, listBetRequestsHandler,
@@ -93,6 +102,12 @@ router.patch('/team/:id/cpa', requireAuth, requireRole('TEAM_ADMIN', 'SUPER_ADMI
 router.get('/approvals', requireAuth, requireRole('TEAM_ADMIN', 'SUPER_ADMIN'), approvals)
 router.patch('/approvals/:id', requireAuth, requireRole('TEAM_ADMIN', 'SUPER_ADMIN'), patchApproval)
 
+// ---- Casas de aposta (SUPER_ADMIN) ----
+router.get('/betting-houses', requireAuth, requireRole('SUPER_ADMIN'), listBettingHousesHandler)
+router.post('/betting-houses', requireAuth, requireRole('SUPER_ADMIN'), createBettingHouseHandler)
+router.patch('/betting-houses/:id', requireAuth, requireRole('SUPER_ADMIN'), updateBettingHouseHandler)
+router.delete('/betting-houses/:id', requireAuth, requireRole('SUPER_ADMIN'), deleteBettingHouseHandler)
+
 // ---- Sincronização (SUPER_ADMIN) ----
 router.post('/sync/:houseSlug', requireAuth, requireRole('SUPER_ADMIN'), syncHouse)
 
@@ -100,5 +115,8 @@ router.post('/sync/:houseSlug', requireAuth, requireRole('SUPER_ADMIN'), syncHou
 router.get('/users', requireAuth, requireRole('SUPER_ADMIN'), getUsersHandler)
 router.patch('/users/:id/role', requireAuth, requireRole('SUPER_ADMIN'), patchUserRoleHandler)
 router.patch('/users/:id/team', requireAuth, requireRole('SUPER_ADMIN'), patchUserTeamHandler)
+
+// ---- Logs de atividade (SUPER_ADMIN) ----
+router.get('/activity-logs', requireAuth, requireRole('SUPER_ADMIN'), listActivityLogsHandler)
 
 export default router

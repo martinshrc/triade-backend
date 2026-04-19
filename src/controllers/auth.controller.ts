@@ -10,6 +10,7 @@ import {
   changePassword, changePasswordSchema,
 } from '../services/auth.service'
 import { jwtConfig } from '../config/jwt'
+import { logActivity, getIp } from '../lib/activity'
 
 export async function registerHandler(req: Request, res: Response) {
   const parsed = registerSchema.safeParse(req.body)
@@ -38,6 +39,7 @@ export async function loginHandler(req: Request, res: Response) {
   res.cookie('access_token', result.accessToken, jwtConfig.cookieOptions)
   res.cookie('refresh_token', result.refreshToken, jwtConfig.refreshCookieOptions)
 
+  logActivity(result.user.id, 'login', getIp(req))
   res.json({ user: result.user })
 }
 
@@ -70,7 +72,10 @@ export async function refreshHandler(req: Request, res: Response) {
 }
 
 export async function logoutHandler(req: Request, res: Response) {
-  if (req.user?.id) await logout(req.user.id)
+  if (req.user?.id) {
+    logActivity(req.user.id, 'logout', getIp(req))
+    await logout(req.user.id)
+  }
 
   res.clearCookie('access_token')
   res.clearCookie('refresh_token', { path: '/api/auth/refresh' })
@@ -81,6 +86,7 @@ export async function updateProfileHandler(req: Request, res: Response) {
   const parsed = updateProfileSchema.safeParse(req.body)
   if (!parsed.success) { res.status(400).json({ error: parsed.error.issues[0].message }); return }
   const updated = await updateProfile(req.user.id, parsed.data)
+  logActivity(req.user.id, 'update_profile', getIp(req))
   res.json(updated)
 }
 
@@ -88,6 +94,7 @@ export async function changePasswordHandler(req: Request, res: Response) {
   const parsed = changePasswordSchema.safeParse(req.body)
   if (!parsed.success) { res.status(400).json({ error: parsed.error.issues[0].message }); return }
   await changePassword(req.user.id, parsed.data.password)
+  logActivity(req.user.id, 'change_password', getIp(req))
   // Invalida cookies para forçar novo login
   res.clearCookie('access_token')
   res.clearCookie('refresh_token', { path: '/api/auth/refresh' })

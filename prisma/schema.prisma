@@ -63,6 +63,7 @@ model User {
   nfes             Nfe[]
   betRequests      BetAccessRequest[] @relation("UserBetRequests")
   reviewedRequests BetAccessRequest[] @relation("ReviewedBetRequests")
+  activityLogs     ActivityLog[]
 
   @@map("users")
 }
@@ -305,6 +306,25 @@ enum NfeStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+// ============================================================
+// LOG DE ATIVIDADE
+// ============================================================
+model ActivityLog {
+  id        String   @id @default(uuid())
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+
+  // Ação curta e legível, ex: "login", "create_house:Sportingbet", "approve_user:João"
+  action    String
+
+  ip        String?
+
+  createdAt DateTime @default(now())
+
+  @@map("activity_logs")
 }
 
 // ============================================================

@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import {
   createBetRequest, listBetRequests, reviewBetRequest, listBetsWithAccess,
 } from '../services/bet-access.service'
+import { logActivity, getIp } from '../lib/activity'
 
 export async function requestBetAccessHandler(req: Request, res: Response) {
   const { bettingHouseId } = req.body
@@ -30,6 +31,9 @@ export async function reviewBetRequestHandler(req: Request, res: Response) {
   }
 
   const result = await reviewBetRequest(requestId, req.user.id, req.user.role, action, notes)
+  const r = result as { bettingHouse?: { name?: string }; user?: { name?: string } }
+  const label = `${action === 'APPROVED' ? 'approve_bet' : 'reject_bet'}:${r.bettingHouse?.name ?? '?'}:${r.user?.name ?? '?'}`
+  logActivity(req.user.id, label, getIp(req))
   res.json(result)
 }
 

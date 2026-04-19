@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import { listUsers, updateUserRole, updateUserTeam } from '../services/users.service'
+import { logActivity, getIp } from '../lib/activity'
 
 export async function getUsersHandler(req: Request, res: Response) {
   const page = Math.max(1, Number(req.query.page ?? 1))
@@ -24,6 +25,8 @@ export async function patchUserRoleHandler(req: Request, res: Response) {
   }
 
   const updated = await updateUserRole(targetId, role)
+  const u = updated as { name?: string }
+  logActivity(req.user.id, `change_role:${u.name ?? targetId}:${role}`, getIp(req))
   res.json(updated)
 }
 

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { ApprovalStatus } from '@prisma/client'
 import { getApprovals, reviewApproval } from '../services/approvals.service'
+import { logActivity, getIp } from '../lib/activity'
 
 const MAX_LIMIT = 50
 
@@ -34,5 +35,8 @@ export async function patchApproval(req: Request, res: Response) {
   }
 
   const updated = await reviewApproval(req.user.id, approvalId, status as ApprovalStatus, cpaValue)
+  const userName = (updated as { user?: { name?: string } }).user?.name ?? approvalId
+  const verb = status === 'APPROVED' ? 'approve_user' : status === 'REJECTED' ? 'reject_user' : 'review_user'
+  logActivity(req.user.id, `${verb}:${userName}`, getIp(req))
   res.json(updated)
 }
