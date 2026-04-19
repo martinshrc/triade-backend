@@ -27,10 +27,16 @@ const allowedOrigins =
     ? productionOrigins
     : ['http://localhost:5173', 'http://localhost:4173', 'http://localhost:8080']
 
-app.use(cors({
+const corsOptions = {
   origin: allowedOrigins,
-  credentials: true, // necessário para enviar cookies cross-origin
-}))
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+}
+
+// Responde preflight OPTIONS explicitamente
+app.options('*', cors(corsOptions))
+app.use(cors(corsOptions))
 
 app.use(express.json())
 app.use(cookieParser())
