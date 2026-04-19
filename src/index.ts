@@ -9,6 +9,9 @@ import { errorHandler } from './middlewares/error.middleware'
 
 const app = express()
 
+// Necessário para rate-limit e IPs reais atrás do Traefik/proxy
+app.set('trust proxy', 1)
+
 // Headers de segurança HTTP
 app.use(helmet({ crossOriginResourcePolicy: false }))
 
