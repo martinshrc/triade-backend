@@ -27,15 +27,12 @@ const allowedOrigins =
     ? productionOrigins
     : ['http://localhost:5173', 'http://localhost:4173', 'http://localhost:8080']
 
-// CORS manual — garante headers independente do proxy
+// CORS — hardcoded para diagnóstico de Traefik
 app.use((req, res, next) => {
-  const origin = req.headers.origin as string | undefined
-  if (origin && allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin)
-    res.setHeader('Access-Control-Allow-Credentials', 'true')
-    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS')
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,Cookie')
-  }
+  res.setHeader('Access-Control-Allow-Origin', 'https://triade.admaiss.com.br')
+  res.setHeader('Access-Control-Allow-Credentials', 'true')
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,Cookie')
   if (req.method === 'OPTIONS') {
     res.sendStatus(204)
     return
