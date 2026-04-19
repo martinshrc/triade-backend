@@ -106,7 +106,7 @@ export async function meHandler(req: Request, res: Response) {
   const { default: prisma } = await import('../config/database')
   const user = await prisma.user.findUnique({
     where: { id: req.user.id },
-    select: { id: true, name: true, email: true, status: true, role: true, cpaValue: true, externalId: true },
+    select: { id: true, name: true, email: true, status: true, role: true, cpaValue: true, externalId: true, whatsapp: true },
   })
   if (!user) { res.status(404).json({ error: 'Usuário não encontrado.' }); return }
   res.json(user)
