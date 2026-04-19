@@ -10,7 +10,7 @@ import { errorHandler } from './middlewares/error.middleware'
 const app = express()
 
 // Headers de segurança HTTP
-app.use(helmet())
+app.use(helmet({ crossOriginResourcePolicy: false }))
 
 const rawOrigins = process.env.ALLOWED_ORIGINS ?? ''
 const productionOrigins = rawOrigins
