@@ -44,7 +44,7 @@ export type LoginInput = z.infer<typeof loginSchema>
 
 const INVITE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // sem chars ambíguos
 
-async function generateUniqueInviteCode(): Promise<string> {
+export async function generateUniqueInviteCode(): Promise<string> {
   for (let attempt = 0; attempt < 10; attempt++) {
     const code = Array.from(
       { length: 8 },

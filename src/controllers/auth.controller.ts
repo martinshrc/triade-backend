@@ -111,11 +111,24 @@ export async function checkEmailHandler(req: Request, res: Response) {
 
 export async function meHandler(req: Request, res: Response) {
   const { default: prisma } = await import('../config/database')
-  const user = await prisma.user.findUnique({
+  const { generateUniqueInviteCode } = await import('../services/auth.service')
+
+  let user = await prisma.user.findUnique({
     where: { id: req.user.id },
     select: { id: true, name: true, email: true, status: true, role: true, cpaValue: true, externalId: true, whatsapp: true, inviteCode: true },
   })
   if (!user) { res.status(404).json({ error: 'Usuário não encontrado.' }); return }
+
+  // Gera inviteCode lazy para usuários que ainda não têm (sem precisar de logout/login)
+  if (!user.inviteCode) {
+    const inviteCode = await generateUniqueInviteCode()
+    user = await prisma.user.update({
+      where: { id: user.id },
+      data: { inviteCode },
+      select: { id: true, name: true, email: true, status: true, role: true, cpaValue: true, externalId: true, whatsapp: true, inviteCode: true },
+    })
+  }
+
   res.json(user)
 }
 
