@@ -1,4 +1,4 @@
-import { BetAccessStatus, Prisma } from '@prisma/client'
+import { BetAccessStatus, Prisma, Role } from '@prisma/client'
 import prisma from '../config/database'
 
 // Afiliado solicita acesso a uma casa de aposta
@@ -161,9 +161,10 @@ export async function grantBetAccess(
 export async function listHouseUsers(adminId: string, adminRole: string, houseId: string) {
   // Todos os usuários não-rejeitados (ou da equipe se TEAM_ADMIN)
   // Inclui PENDING para permitir pré-atribuição antes da aprovação
+  const allowedRoles = ['AFFILIATE', 'TEAM_ADMIN'] as Role[]
   const usersWhere = adminRole === 'TEAM_ADMIN'
-    ? { referrerId: adminId, status: { not: 'REJECTED' as const } }
-    : { status: { not: 'REJECTED' as const } }
+    ? { referrerId: adminId, status: { not: 'REJECTED' as const }, role: { in: allowedRoles } }
+    : { status: { not: 'REJECTED' as const }, role: { in: allowedRoles } }
 
   const [users, requests, links] = await Promise.all([
     prisma.user.findMany({

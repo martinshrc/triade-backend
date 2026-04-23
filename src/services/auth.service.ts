@@ -135,6 +135,10 @@ export async function login(input: LoginInput) {
 
   if (!user || !passwordMatch) throw new Error('E-mail ou senha inválidos.')
 
+  if (user.status !== 'APPROVED') {
+    throw new Error('Sua conta ainda não foi aprovada. Aguarde a revisão do administrador.')
+  }
+
   // Gera inviteCode lazy para usuários criados antes desta feature
   let inviteCode = user.inviteCode
   if (!inviteCode) {
@@ -167,6 +171,8 @@ export async function refresh(userId: string, token: string) {
 
   const valid = await bcrypt.compare(token, user.refreshToken)
   if (!valid) throw new Error('Sessão inválida.')
+
+  if (user.status !== 'APPROVED') throw new Error('Conta desativada.')
 
   // Rotaciona o refresh token
   const newAccessToken = generateAccessToken(user.id, user.role)
